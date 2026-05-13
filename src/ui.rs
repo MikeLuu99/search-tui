@@ -17,22 +17,25 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         None
     };
     let help_text = match &app.mode {
-        Mode::Input   => "  enter:search  esc:quit",
+        Mode::Input => "  enter:search  esc:quit",
         Mode::Loading => "  searching…",
-        Mode::Browse  => "  jk:move  l/enter:open  h/:search  q:quit",
+        Mode::Browse => "  jk:move  l/enter:open  h/:search  q:quit",
         Mode::Error(_) => "  h/:search  q:quit",
     };
 
     let area = frame.area();
-    let [search_area, results_area, help_area] =
-        ratatui::layout::Layout::vertical([
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(1),
-        ])
-        .areas(area);
+    let [search_area, results_area, help_area] = ratatui::layout::Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .areas(area);
 
-    let border_color = if is_input { Color::Yellow } else { Color::White };
+    let border_color = if is_input {
+        Color::Yellow
+    } else {
+        Color::White
+    };
     frame.render_widget(
         Paragraph::new(app.input.as_str()).block(
             Block::bordered()
@@ -92,7 +95,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                     lines.push(Line::from(vec![
                         Span::raw("     "),
                         Span::styled(
-                            s.char_indices().nth(100).map_or(s.as_str(), |(i, _)| &s[..i]).to_string(),
+                            s.char_indices()
+                                .nth(100)
+                                .map_or(s.as_str(), |(i, _)| &s[..i])
+                                .to_string(),
                             Style::default().fg(Color::Gray),
                         ),
                     ]));
