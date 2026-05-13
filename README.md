@@ -7,12 +7,10 @@ A terminal UI for the metadata search engine, built with [ratatui](https://ratat
 From the workspace root:
 
 ```bash
-cargo run -p search-tui
-cargo install -p search-tui
-# or after installing:
-stx
+cargo install search-tui
+sui "your query"
 ```
 
 ## Terminal UI
 
-![stx TUI](assets/tui_screenshots.png)
+![sui TUI](assets/tui_screenshots.png)

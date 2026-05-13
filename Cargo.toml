@@ -1,10 +1,17 @@
 [package]
 name = "search-tui"
 version = "0.1.0"
+authors = ["ml <mikeluu089@proton.me>"]
 edition = "2024"
+description = "Terminal UI for a Metadata Search Engine"
+license = "MIT"
+repository = "https://github.com/MikeLuu99/search-tui"
+readme = "README.md"
+keywords = ["metadata", "search", "engine", "scraper", "searxng"]
+categories = ["api-bindings", "algorithms", "development-tools"]
 
 [[bin]]
-name = "stx"
+name = "sui"
 path = "src/main.rs"
 
 [dependencies]
