@@ -15,6 +15,14 @@ pub struct App {
     pub list_state: ListState,
 }
 
+// 1. Implementation of the Default trait
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// 2. Inherent implementation for App methods
 impl App {
     pub fn new() -> Self {
         Self {
@@ -27,8 +35,11 @@ impl App {
 
     pub fn set_results(&mut self, results: Vec<AggregatedResult>) {
         self.results = results;
-        self.list_state
-            .select(if self.results.is_empty() { None } else { Some(0) });
+        self.list_state.select(if self.results.is_empty() {
+            None
+        } else {
+            Some(0)
+        });
         self.mode = Mode::Browse;
     }
 
