@@ -8,10 +8,18 @@ pub enum Mode {
     Error(String),
 }
 
+/// A completed search fan-out: aggregated results plus which engines failed,
+/// so the UI can surface partial failures instead of hiding them.
+pub struct SearchOutcome {
+    pub results: Vec<AggregatedResult>,
+    pub engines_failed: Vec<String>,
+}
+
 pub struct App {
     pub mode: Mode,
     pub input: String,
     pub results: Vec<AggregatedResult>,
+    pub engines_failed: Vec<String>,
     pub list_state: ListState,
 }
 
@@ -29,6 +37,7 @@ impl App {
             mode: Mode::Input,
             input: String::new(),
             results: Vec::new(),
+            engines_failed: Vec::new(),
             list_state: ListState::default(),
         }
     }
@@ -41,6 +50,11 @@ impl App {
             Some(0)
         });
         self.mode = Mode::Browse;
+    }
+
+    pub fn set_outcome(&mut self, outcome: SearchOutcome) {
+        self.engines_failed = outcome.engines_failed;
+        self.set_results(outcome.results);
     }
 
     pub fn next(&mut self) {

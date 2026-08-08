@@ -1,5 +1,5 @@
 use metadata_search_engine_rs::models::AggregatedResult;
-use search_tui::app::{App, Mode};
+use search_tui::app::{App, Mode, SearchOutcome};
 
 fn make_result(title: &str, url: &str) -> AggregatedResult {
     AggregatedResult {
@@ -216,4 +216,33 @@ fn snippet_is_preserved_on_results() {
         "The Rust programming language documentation.",
     )]);
     assert!(app.results[0].snippet.is_some());
+}
+
+// ---------------------------------------------------------------------------
+// App::set_outcome
+// ---------------------------------------------------------------------------
+
+#[test]
+fn set_outcome_records_failed_engines() {
+    let mut app = App::new();
+    app.set_outcome(SearchOutcome {
+        results: vec![make_result("Rust", "https://rust-lang.org")],
+        engines_failed: vec!["brave".to_string(), "yahoo".to_string()],
+    });
+    assert!(matches!(app.mode, Mode::Browse));
+    assert_eq!(app.engines_failed, vec!["brave", "yahoo"]);
+}
+
+#[test]
+fn set_outcome_no_failures_clears_list() {
+    let mut app = App::new();
+    app.set_outcome(SearchOutcome {
+        results: vec![make_result("Rust", "https://rust-lang.org")],
+        engines_failed: vec!["brave".to_string()],
+    });
+    app.set_outcome(SearchOutcome {
+        results: vec![make_result("Go", "https://go.dev")],
+        engines_failed: vec![],
+    });
+    assert!(app.engines_failed.is_empty());
 }

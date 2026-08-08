@@ -6,7 +6,7 @@ use std::io::{self, Stdout};
 use std::sync::Arc;
 use std::time::Duration;
 
-use app::{App, Mode};
+use app::{App, Mode, SearchOutcome};
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
@@ -14,8 +14,11 @@ use crossterm::{
 };
 use metadata_search_engine_rs::{
     aggregator::{aggregate, query_all_engines},
-    engines::{BraveEngine, DuckDuckGoEngine, SearchEngine, StartpageEngine, build_http_client},
-    models::AggregatedResult,
+    cache::EngineLimits,
+    engines::{
+        BraveEngine, DuckDuckGoEngine, SearchEngine, StartpageEngine, YahooEngine,
+        build_http_client,
+    },
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tokio::sync::mpsc;
@@ -27,16 +30,17 @@ use tokio::sync::mpsc;
 async fn run(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    rx: &mut mpsc::Receiver<Result<Vec<AggregatedResult>, String>>,
-    tx: mpsc::Sender<Result<Vec<AggregatedResult>, String>>,
+    rx: &mut mpsc::Receiver<Result<SearchOutcome, String>>,
+    tx: mpsc::Sender<Result<SearchOutcome, String>>,
     engines: Vec<Arc<dyn SearchEngine>>,
+    limits: Arc<EngineLimits>,
 ) -> anyhow::Result<()> {
     loop {
         terminal.draw(|f| ui::ui(f, app))?;
 
         if let Ok(msg) = rx.try_recv() {
             match msg {
-                Ok(results) => app.set_results(results),
+                Ok(outcome) => app.set_outcome(outcome),
                 Err(e) => app.mode = Mode::Error(e),
             }
         }
@@ -62,14 +66,11 @@ async fn run(
                         app.mode = Mode::Loading;
                         let tx = tx.clone();
                         let engines = engines.clone();
+                        let limits = Arc::clone(&limits);
                         tokio::spawn(async move {
-                            let (successes, _) = query_all_engines(&engines, &query, 10).await;
-                            let result = if successes.is_empty() {
-                                Err("All engines failed to respond.".to_string())
-                            } else {
-                                Ok(aggregate(successes, 10))
-                            };
-                            let _ = tx.send(result).await;
+                            tx.send(run_search(&engines, &limits, &query, 10).await)
+                                .await
+                                .ok();
                         });
                     }
                 }
@@ -121,23 +122,19 @@ async fn run(
 async fn main() -> anyhow::Result<()> {
     let client = Arc::new(build_http_client()?);
     let engines: Vec<Arc<dyn SearchEngine>> = vec![
-        Arc::new(DuckDuckGoEngine {
-            client: Arc::clone(&client),
-        }),
-        Arc::new(BraveEngine {
-            client: Arc::clone(&client),
-        }),
-        Arc::new(StartpageEngine {
-            client: Arc::clone(&client),
-        }),
+        Arc::new(DuckDuckGoEngine::new(Arc::clone(&client))),
+        Arc::new(BraveEngine::new(Arc::clone(&client))),
+        Arc::new(StartpageEngine::new(Arc::clone(&client))),
+        Arc::new(YahooEngine::new(Arc::clone(&client))),
     ];
+    let limits = Arc::new(EngineLimits::new(1, std::time::Duration::from_secs(5)));
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
-    let (tx, mut rx) = mpsc::channel::<Result<Vec<AggregatedResult>, String>>(1);
+    let (tx, mut rx) = mpsc::channel::<Result<SearchOutcome, String>>(1);
     let mut app = App::new();
 
     let initial_query: String = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
@@ -146,23 +143,57 @@ async fn main() -> anyhow::Result<()> {
         app.mode = Mode::Loading;
         let tx2 = tx.clone();
         let engines2 = engines.clone();
+        let limits2 = Arc::clone(&limits);
         let query = app.input.clone();
         tokio::spawn(async move {
-            let (successes, _) = query_all_engines(&engines2, &query, 10).await;
-            let result = if successes.is_empty() {
-                Err("All engines failed to respond.".to_string())
-            } else {
-                Ok(aggregate(successes, 10))
-            };
-            let _ = tx2.send(result).await;
+            let _ = tx2
+                .send(run_search(&engines2, &limits2, &query, 10).await)
+                .await;
         });
     }
 
-    let result = run(&mut terminal, &mut app, &mut rx, tx, engines).await;
+    let result = run(&mut terminal, &mut app, &mut rx, tx, engines, limits).await;
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     result
+}
+
+// ---------------------------------------------------------------------------
+// Search helpers
+// ---------------------------------------------------------------------------
+
+/// Run one query against all engines and build a [`SearchOutcome`].
+///
+/// If every engine fails we return an error message naming them; otherwise we
+/// return the aggregated results plus the list of engines that failed, so the
+/// UI can show partial-failure warnings.
+async fn run_search(
+    engines: &[Arc<dyn SearchEngine>],
+    limits: &EngineLimits,
+    query: &str,
+    max_results: usize,
+) -> Result<SearchOutcome, String> {
+    let (successes, failures) = query_all_engines(engines, limits, query, max_results).await;
+
+    if successes.is_empty() {
+        let failed = failures
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!("All engines failed to respond ({failed})."));
+    }
+
+    let engines_failed = failures
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect::<Vec<_>>();
+
+    Ok(SearchOutcome {
+        results: aggregate(successes, max_results),
+        engines_failed,
+    })
 }

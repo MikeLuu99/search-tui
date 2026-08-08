@@ -1,7 +1,7 @@
 use insta::assert_snapshot;
 use metadata_search_engine_rs::models::AggregatedResult;
 use ratatui::{Terminal, backend::TestBackend};
-use search_tui::app::{App, Mode};
+use search_tui::app::{App, Mode, SearchOutcome};
 use search_tui::ui::ui;
 
 fn make_result(title: &str, url: &str) -> AggregatedResult {
@@ -107,6 +107,17 @@ fn snapshot_browse_second_item_selected() {
         make_result("Serde serialization", "https://serde.rs"),
     ]);
     app.next();
+    let terminal = render(&mut app);
+    assert_snapshot!(terminal.backend());
+}
+
+#[test]
+fn snapshot_browse_with_failed_engines() {
+    let mut app = App::new();
+    app.set_outcome(SearchOutcome {
+        results: vec![make_result("Tokio async runtime", "https://tokio.rs")],
+        engines_failed: vec!["brave".to_string(), "startpage".to_string()],
+    });
     let terminal = render(&mut app);
     assert_snapshot!(terminal.backend());
 }

@@ -6,7 +6,7 @@ expression: terminal.backend()
 "│                                                                              │"
 "└──────────────────────────────────────────────────────────────────────────────┘"
 "┌ Results (1) ─────────────────────────────────────────────────────────────────┐"
-"│▶  #1 Serde  [ddg]                                                            │"
+"│▶  #1 Serde  [ddg]  1.000                                                     │"
 "│       https://serde.rs                                                       │"
 "│       A framework for serializing and deserializing Rust data structures effi│"
 "│                                                                              │"

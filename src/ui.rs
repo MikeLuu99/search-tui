@@ -85,6 +85,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                             format!("  [{}]", r.engines.join(", ")),
                             Style::default().fg(Color::Green),
                         ),
+                        Span::styled(
+                            format!("  {:.3}", r.score),
+                            Style::default().fg(Color::Cyan),
+                        ),
                     ]),
                     Line::from(vec![
                         Span::raw("     "),
@@ -112,6 +116,16 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
             " Results ".to_string()
         } else {
             format!(" Results ({}) ", app.results.len())
+        };
+        let title = if app.engines_failed.is_empty() {
+            title
+        } else {
+            format!(
+                "{}— {} failed: {} ",
+                title,
+                app.engines_failed.len(),
+                app.engines_failed.join(", ")
+            )
         };
 
         let list = List::new(items)
