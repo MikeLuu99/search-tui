@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use app::{App, Mode, SearchOutcome};
+use clap::Parser;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
@@ -34,6 +35,7 @@ async fn run(
     tx: mpsc::Sender<Result<SearchOutcome, String>>,
     engines: Vec<Arc<dyn SearchEngine>>,
     limits: Arc<EngineLimits>,
+    max_results: usize,
 ) -> anyhow::Result<()> {
     loop {
         terminal.draw(|f| ui::ui(f, app))?;
@@ -68,7 +70,7 @@ async fn run(
                         let engines = engines.clone();
                         let limits = Arc::clone(&limits);
                         tokio::spawn(async move {
-                            tx.send(run_search(&engines, &limits, &query, 10).await)
+                            tx.send(run_search(&engines, &limits, &query, max_results).await)
                                 .await
                                 .ok();
                         });
@@ -115,11 +117,30 @@ async fn run(
 }
 
 // ---------------------------------------------------------------------------
+// Command-line interface
+// ---------------------------------------------------------------------------
+
+#[derive(Parser)]
+#[command(name = "sui", version, about = "Terminal UI for the metadata search engine")]
+struct Cli {
+    /// Query to search immediately on startup. Multiple words are joined.
+    query: Vec<String>,
+
+    /// Number of results to request per engine (default: 10).
+    #[arg(short, long)]
+    max_results: Option<usize>,
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let initial_query = cli.query.join(" ");
+    let max_results = cli.max_results.unwrap_or(10);
+
     let client = Arc::new(build_http_client()?);
     let engines: Vec<Arc<dyn SearchEngine>> = vec![
         Arc::new(DuckDuckGoEngine::new(Arc::clone(&client))),
@@ -137,22 +158,21 @@ async fn main() -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::channel::<Result<SearchOutcome, String>>(1);
     let mut app = App::new();
 
-    let initial_query: String = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
-    if !initial_query.trim().is_empty() {
-        app.input = initial_query.trim().to_string();
+    let initial_query = initial_query.trim().to_string();
+    if !initial_query.is_empty() {
+        app.input = initial_query.clone();
         app.mode = Mode::Loading;
         let tx2 = tx.clone();
         let engines2 = engines.clone();
         let limits2 = Arc::clone(&limits);
-        let query = app.input.clone();
         tokio::spawn(async move {
             let _ = tx2
-                .send(run_search(&engines2, &limits2, &query, 10).await)
+                .send(run_search(&engines2, &limits2, &initial_query, max_results).await)
                 .await;
         });
     }
 
-    let result = run(&mut terminal, &mut app, &mut rx, tx, engines, limits).await;
+    let result = run(&mut terminal, &mut app, &mut rx, tx, engines, limits, max_results).await;
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
