@@ -148,7 +148,14 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(StartpageEngine::new(Arc::clone(&client))),
         Arc::new(YahooEngine::new(Arc::clone(&client))),
     ];
-    let limits = Arc::new(EngineLimits::new(1, std::time::Duration::from_secs(5)));
+    // Bound the fan-out with a deadline: engines still in flight when it
+    // elapses are abandoned instead of stalling the UI for their full 8s
+    // engine timeout (e.g. DDG's /html/ endpoint slow-drips under throttle).
+    // Healthy engines finish well under this.
+    let limits = Arc::new(
+        EngineLimits::new(1, std::time::Duration::from_secs(5))
+            .with_deadline(Some(std::time::Duration::from_millis(3000))),
+    );
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
