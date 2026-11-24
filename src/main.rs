@@ -121,7 +121,11 @@ async fn run(
 // ---------------------------------------------------------------------------
 
 #[derive(Parser)]
-#[command(name = "sui", version, about = "Terminal UI for the metadata search engine")]
+#[command(
+    name = "sui",
+    version,
+    about = "Terminal UI for the metadata search engine"
+)]
 struct Cli {
     /// Query to search immediately on startup. Multiple words are joined.
     query: Vec<String>,
@@ -154,6 +158,9 @@ async fn main() -> anyhow::Result<()> {
     // Healthy engines finish well under this.
     let limits = Arc::new(
         EngineLimits::new(1, std::time::Duration::from_secs(5))
+            // Interactive app: cap escalation at 1 minute so a flapping
+            // upstream never silences itself for the 10-minute library default.
+            .with_max_cooldown(std::time::Duration::from_secs(60))
             .with_deadline(Some(std::time::Duration::from_millis(3000))),
     );
 
@@ -179,7 +186,16 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
-    let result = run(&mut terminal, &mut app, &mut rx, tx, engines, limits, max_results).await;
+    let result = run(
+        &mut terminal,
+        &mut app,
+        &mut rx,
+        tx,
+        engines,
+        limits,
+        max_results,
+    )
+    .await;
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;

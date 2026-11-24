@@ -31,7 +31,7 @@ async fn main() {
 }
 
 async fn convert_html_to_md(urls: &[&str]) -> String {
-    let client = Arc::new(reqwest::Client::new());
+    let client = Arc::new(metadata_search_engine_rs::engines::build_http_client().unwrap());
     let converter = Arc::new(Mutex::new(
         HtmlToMarkdown::builder()
             .skip_tags(vec!["script", "style"])

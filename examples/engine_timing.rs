@@ -44,26 +44,36 @@ async fn main() -> anyhow::Result<()> {
     let limits = metadata_search_engine_rs::cache::EngineLimits::new(1, Duration::from_secs(5));
     let t0 = Instant::now();
     let (successes, failures) =
-        metadata_search_engine_rs::aggregator::query_all_engines(&engines, &limits, &query, 10).await;
+        metadata_search_engine_rs::aggregator::query_all_engines(&engines, &limits, &query, 10)
+            .await;
     println!(
         "\nfan-out (no deadline): {:.1}s, {} ok / {} failed ({})",
         t0.elapsed().as_secs_f64(),
         successes.len(),
         failures.len(),
-        failures.iter().map(|f| f.0.clone()).collect::<Vec<_>>().join(", ")
+        failures
+            .iter()
+            .map(|f| f.0.clone())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 
     // Same fan-out with the TUI's new deadline.
     let limits = limits.with_deadline(Some(Duration::from_millis(3000)));
     let t0 = Instant::now();
     let (successes, failures) =
-        metadata_search_engine_rs::aggregator::query_all_engines(&engines, &limits, &query, 10).await;
+        metadata_search_engine_rs::aggregator::query_all_engines(&engines, &limits, &query, 10)
+            .await;
     println!(
         "fan-out (3s deadline): {:.1}s, {} ok / {} failed ({})",
         t0.elapsed().as_secs_f64(),
         successes.len(),
         failures.len(),
-        failures.iter().map(|f| f.0.clone()).collect::<Vec<_>>().join(", ")
+        failures
+            .iter()
+            .map(|f| f.0.clone())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
     Ok(())
 }
